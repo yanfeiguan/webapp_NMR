@@ -1,0 +1,390 @@
+
+{% extends "NMR_Prediction/base.html" %}
+{% load static %}
+{% block extendscript %}
+  <link type="text/css" rel="stylesheet" href="{% static 'NMR_Prediction/js/marvin/lib/rainbow/github.css' %}">
+  <link rel="stylesheet" type="text/css" href="{% static 'NMR_Prediction/sketch.css' %}">
+
+  <script src="{% static 'NMR_Prediction/jquery/jquery-3.1.0.js' %}"></script>
+  <script>
+    var jQuery_3_1_0 = $.noConflict(true);
+  </script>
+  <script src="{% static 'NMR_Prediction/jquery/ajax_csrf.js' %}"></script>
+	<script src="{% static 'NMR_Prediction/js/marvin/lib/jquery-1.9.1.min.js' %}"></script>
+	<script src="{% static 'NMR_Prediction/js/marvin/lib/rainbow/rainbow-custom.min.js' %}"></script>
+	<script src="{% static 'NMR_Prediction/gui/lib/promise-1.0.0.min.js' %}"></script>
+	<script src="{% static 'NMR_Prediction/gui/gui.nocache.js' %}"></script>
+  <script src="{% static 'NMR_Prediction/js/marvin/marvinjslauncher.js' %}"></script>
+  <script src="{% static 'NMR_Prediction/js/JSmol.min.js' %}"></script>
+  <script src="{% static 'NMR_Prediction/js/Jmol2.js' %}"></script>
+  <script>
+		var marvinSketcherInstance;
+		var buttonAttributes;
+    var srcTextBox;
+    var nnResultsJSmol;
+    var nnResultsShifts;
+    var confNum = 1;
+    var nnResults;
+
+    var Info = {
+      color: "#FFFFFF",
+      height: 425,
+      width: 425,
+      use: "HTML5",
+      j2sPath: "{% static 'NMR_Prediction/j2s'%}",
+      isSigned: true,
+      serverURL: "{% static 'NMR_Prediction/php/jsmol.php'%}",
+      disableInitialConsole: true
+    };
+
+    var NNResults = (function() {
+        function NNResults (nnResponse, jsmolWindow, table, confNumtxtBox, energyWindow, label_btn, confTotalNumWindow) {
+            this.nnResponse = nnResponse;
+            this.jsmolWindow = jsmolWindow;
+            this.table = table;
+            this.confNum = 1;
+            this.confNumtxtBox = confNumtxtBox;
+            this.status = 'weighted';
+            this.energyWindow = energyWindow;
+            this.labelStatus = 'On';
+            this.label_btn = label_btn;
+            this.confTotalNumWindow = confTotalNumWindow;
+            this.init();
+        }
+
+        NNResults.prototype.init = function init() {
+          this.nnResultsJsmol = this.nnResponse.jsmol_command.split('!').filter(n => n);
+          this.weightedShift = this.nnResponse.weightedShiftTxt;
+          this.confShift = this.nnResponse.confShiftTxt.split('!').filter(n => n);
+          this.relative_E = this.nnResponse.relative_E.split('!').filter(n => n);
+          this.confTotalNumWindow.innerHTML = "Number of Conformers: "+this.nnResultsJsmol.length;
+
+          this.showJSmol();
+          this.showConfNum();
+          this.showWeightedShift();
+          this.showPlainEnergy();
+        };
+
+        NNResults.prototype.next = function next() {
+
+          if (this.status == 'weighted') {
+            alert('To view conformers please click on Conformers button')
+          } else if (this.confNum == this.nnResultsJsmol.length) {
+            alert('You have hit the last conformer');
+          } else {
+            this.confNum += 1;
+            this.showJSmol();
+            this.showConfNum();
+            this.showConfShift();
+            this.showEnergy();
+          };
+        };
+
+        NNResults.prototype.previous = function previous() {
+          if (this.status == 'weighted') {
+            alert('To view conformers please click on Conformers button')
+          } else if (this.confNum == 1) {
+            alert('You are at the the first conformer');
+          } else {
+            this.confNum -= 1;
+            this.showJSmol();
+            this.showConfNum();
+            this.showConfShift();
+            this.showEnergy();
+          }
+        };
+
+        NNResults.prototype.showJSmol = function showJSmol() {
+          Jmol.script(this.jsmolWindow, this.nnResultsJsmol[this.confNum-1]);
+          Jmol.script(this.jsmolWindow, "select Carbon");
+          Jmol.script(this.jsmolWindow, "label %a");
+        };
+
+        NNResults.prototype.showConfNum = function showConfNum() {
+          this.confNumtxtBox.val(this.confNum);
+        }
+
+        NNResults.prototype.goConformer = function goConformer() {
+          if (this.status == 'weighted') {
+            alert('To view conformers please click on Conformers button')
+          } else {
+            this.confNum = parseInt(this.confNumtxtBox.val(), 10);
+            this.showJSmol();
+            this.showEnergy();
+            this.showConfShift();
+            this.showEnergy();
+          }
+        }
+
+        NNResults.prototype.showWeightedShift = function showWeightedShift() {
+          this.showShift(this.weightedShift);
+        }
+
+        NNResults.prototype.showConfShift = function showConfShift() {
+          this.showShift(this.confShift[this.confNum-1]);
+        }
+
+        NNResults.prototype.showWeighted = function showWeighted() {
+          Jmol.script(this.jsmolWindow, this.nnResultsJsmol[0]);
+          Jmol.script(this.jsmolWindow, "select Carbon");
+          Jmol.script(this.jsmolWindow, "label %a");
+          this.confNumtxtBox.val(1);
+          this.showWeightedShift();
+          this.status = 'weighted';
+          this.showPlainEnergy();
+        }
+
+        NNResults.prototype.showConformers = function showConformers() {
+          this.status = 'conformers';
+          this.showJSmol();
+          this.showConfNum();
+          this.showConfShift();
+          this.showEnergy();
+        }
+
+        NNResults.prototype.showShift = function showShift(shifttxt) {
+
+          new_tbody = document.createElement('tbody');
+
+          var shifts = shifttxt.split(';');
+          shifts = shifts.filter(n => n);
+          for (s of shifts) {
+            shift_temp = s.split(',');
+
+            var row = new_tbody.insertRow(-1);
+            var cell1 = row.insertCell(0);
+            var cell2 = row.insertCell(1);
+
+            cell1.innerHTML = shift_temp[0];
+            cell2.innerHTML = shift_temp[1];
+          }
+          old_tbody = this.table.tBodies[0];
+          this.table.replaceChild(new_tbody, old_tbody);
+        }
+
+        NNResults.prototype.showEnergy = function showEnergy() {
+          var relativeE = this.relative_E[this.confNum-1].split(',').filter(n => n);
+            this.energyWindow.innerHTML = "Conformer Relative Energy (MMFF): "+relativeE[0]+" kcal/mol<br />Boltzmann Weight: "+relativeE[1];
+        };
+
+        NNResults.prototype.showPlainEnergy = function showPlainEnergy() {
+          this.energyWindow.innerHTML = "Conformer Relative Energy (MMFF):<br />Boltzmann Weight:"
+        };
+
+        NNResults.prototype.controlLabel = function controlLabel() {
+          if (this.labelStatus == 'On') {
+            Jmol.script(this.jsmolWindow, "Label Hide");
+            this.labelStatus = 'Off';
+          }else if (this.labelStatus == 'Off') {
+            Jmol.script(this.jsmolWindow, "Label Display");
+            this.labelStatus = 'On';
+          }
+        }
+
+        return NNResults;
+
+    }());
+
+		$(document).ready(function handleDocumentReady (e) {
+			MarvinJSUtil.getEditor("#sketch").then(function (sketcherInstance) {
+        //srcTextBox = $("#molsource-box")
+				marvinSketcherInstance = sketcherInstance;
+        marvinSketcherInstance.importStructure("mol", caffine).catch(function(error) {
+			       alert(error);
+        });
+				buttonAttributes1 = {
+						"name" : "C13 NMR",
+						"image-url" : "{% static 'NMR_Prediction/images/custom-icon.png' %}",
+						"toolbar" : "W"
+				};
+				marvinSketcherInstance.addButton(buttonAttributes1, exportMol)
+			}, function () {
+				alert("Cannot retrieve sketcher instance from iframe");
+			}).then(function() {
+        $("#jsmoldiv").html(Jmol.getAppletHtml("conformer", Info))
+        jQuery_3_1_0.ajax({
+          url: "/NMR_Prediction/JSmol_startup/",
+          type: "POST",
+          async: true,
+          success: function(responseTxt) {
+            //put the conformer on jsmol
+            Jmol.script(conformer, responseTxt)
+          },
+        });
+
+      }, function() {
+        alert("Cannot load jsmol");
+      }).then(function() {
+        jQuery_3_1_0.ajax({
+          url: "/NMR_Prediction/Shift_startup/",
+          type: "POST",
+          async: true,
+          success: function(responseTxt) {
+            //put the shit to the table
+            update_table(responseTxt)
+          }
+        });
+      }, function() {
+        alert("Cannot load example Shift")
+      });
+    });
+
+    var caffine = "\n\n\n"+
+    	" 14 15  0  0  0  0  0  0  0  0999 V2000\n"+
+    	"    0.5089    7.8316    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"+
+    	"    1.2234    6.5941    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"+
+    	"    1.2234    7.4191    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"+
+    	"   -0.2055    6.5941    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"+
+    	"   -0.9200    7.8316    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"+
+    	"    0.5089    5.3566    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"+
+    	"   -0.2055    7.4191    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"+
+    	"    0.5089    6.1816    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"+
+    	"   -0.9200    6.1816    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n"+
+    	"    0.5089    8.6566    0.0000 O   0  0  0  0  0  0  0  0  0  0  0  0\n"+
+    	"    2.4929    7.0066    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"+
+    	"    2.0080    7.6740    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"+
+    	"    2.0080    6.3391    0.0000 N   0  0  0  0  0  0  0  0  0  0  0  0\n"+
+    	"    2.2630    8.4586    0.0000 C   0  0  0  0  0  0  0  0  0  0  0  0\n"+
+    	"  1  7  1  0  0  0  0\n"+
+    	"  8  2  1  0  0  0  0\n"+
+    	"  1  3  1  0  0  0  0\n"+
+    	"  2  3  2  0  0  0  0\n"+
+    	"  7  4  1  0  0  0  0\n"+
+    	"  4  8  1  0  0  0  0\n"+
+    	"  4  9  2  0  0  0  0\n"+
+    	"  7  5  1  0  0  0  0\n"+
+    	"  8  6  1  0  0  0  0\n"+
+    	"  1 10  2  0  0  0  0\n"+
+    	"  3 12  1  0  0  0  0\n"+
+    	"  2 13  1  0  0  0  0\n"+
+    	" 13 11  2  0  0  0  0\n"+
+    	" 12 11  1  0  0  0  0\n"+
+    	" 12 14  1  0  0  0  0\n"+
+    	"M  END\n";
+
+    var delay = 5;
+
+    function exportMol () {
+      delayCall(exportMolAction, ["smiles"]);
+    };
+
+    function delayCall (method, args) {
+      setTimeout(function () {
+        method.apply(null, args);
+      }, delay);
+    };
+
+    function exportMolAction (format) {
+			var exportPromise = marvinSketcherInstance.exportStructure(format, null);
+			exportPromise.then(function(source) {
+        jQuery_3_1_0.ajax({
+          url: "/NMR_Prediction/NNPredict/",
+          type: "POST",
+          async: true,
+          data: {
+            "molsource": source,
+          },
+          success: function(commandShift) {
+            nnResults = new NNResults(
+              commandShift,
+              conformer,
+              document.getElementById("ShiftTable"),
+              $("#confNumtxtBox"),
+              document.getElementById("relative_E"),
+              document.getElementById("label_btn"),
+              document.getElementById("confTotalNum"),
+            );
+          },
+        });
+			});
+		};
+
+    function update_table (shifttxt) {
+      $("#ShiftTable tbody tr").remove();
+      var table = document.getElementById("ShiftTable").getElementsByTagName('tbody')[0];
+
+      var shifts = shifttxt.split(';');
+      shifts = shifts.filter(n => n)
+      for (s of shifts) {
+        shift_temp = s.split(',');
+
+        var row = table.insertRow(-1);
+        var cell1 = row.insertCell(0);
+        var cell2 = row.insertCell(1);
+
+        cell1.innerHTML = shift_temp[0];
+        cell2.innerHTML = shift_temp[1];
+      };
+    };
+
+	</script>
+{% endblock extendscript%}
+
+{% block content %}
+<div class="column">
+		<div class="resizable">
+	    <iframe src="{% url 'sketcher' %}" style="width: 100%; height:100%;" id="sketch"></iframe>
+		</div>
+</div>
+<div class="column">
+  <div class="molecule-div" id="jsmoldiv"></div>
+  <div class="container ctrl-box" style="width:100%">
+    <div class="btn-group ctrl-box" style="width: 100%">
+      <button style="width:30%" onclick="showWeighted()" class='btn btn-primary btn-ctrl'>Weighted</button>
+      <button style="width:30%" onclick="showConformers()" class='btn btn-primary btn-ctrl'>Conformers</button>
+      <button style="width:30%" onclick="controlLabel()" class='btn btn-primary btn-ctrl' id='label_btn'>Label</button>
+    </div>
+    <div class="btn-group ctrl-box" style="width: 100%">
+      <button style="width:25%" onclick="PreviousConformer()" class='btn btn-primary btn-ctrl'>&laquo; Previous</button>
+      <textarea name="name" id="confNumtxtBox" rows=1 cols=3 class="num-inputer"></textarea>
+      <button style="width:15%" onclick="GoConformer()" class='btn btn-primary btn-ctrl'>Go</button>
+      <button style="width:25%" onclick="NextConformer()" class='btn btn-primary btn-ctrl'>Next &raquo;</button>
+    </div>
+    <div class="ctrl-box" style="width: %100">
+      <p id="confTotalNum">Number of Conformers:</p>
+      <p id="relative_E">Conformer Relative Energy (MMFF):<br />Boltzmann Weight:</p>
+    </div>
+  </div>
+</div>
+<div style="column">
+  <div class="scrolltable">
+    <table id="ShiftTable">
+    <thead>
+    <tr>
+      <th>Atom#</th>
+      <th>Shift</th>
+    </tr>
+    </thead>
+    <tbody>
+    </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  function NextConformer() {
+    nnResults.next();
+  };
+
+  function GoConformer() {
+    nnResults.goConformer();
+  };
+
+  function PreviousConformer() {
+    nnResults.previous();
+  }
+
+  function showWeighted() {
+    nnResults.showWeighted();
+  }
+
+  function showConformers() {
+    nnResults.showConformers();
+  }
+
+  function controlLabel() {
+    nnResults.controlLabel();
+  }
+
+</script>
+{% endblock content %}
