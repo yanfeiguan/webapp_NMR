@@ -19,6 +19,7 @@ from django.conf import settings
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path(r'djangoexample/', include("example.urls")),
 ]
 if settings.ONLY_SIMPLE_HTTP:
     pass

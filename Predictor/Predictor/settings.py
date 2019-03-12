@@ -39,10 +39,13 @@ else:
 
 # Application definition
 
+INSTALLED_APPS = [
+]
+
 if ONLY_SIMPLE_HTTP:
-    INSTALLED_APPS = []
+    pass
 else:
-    INSTALLED_APPS = [
+    INSTALLED_APPS += [
         'NMR_Prediction.apps.NmrPredictionConfig',
     ]
 
@@ -53,6 +56,7 @@ INSTALLED_APPS +=  [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'example',
 ]
 
 MIDDLEWARE = [
