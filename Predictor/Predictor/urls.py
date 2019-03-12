@@ -15,8 +15,14 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path,include
+from django.conf import settings
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('NMR_Prediction/', include('NMR_Prediction.urls')),
 ]
+if settings.ONLY_SIMPLE_HTTP:
+    pass
+else:
+    urlpatterns += [
+        path('NMR_Prediction/', include('NMR_Prediction.urls')),
+    ]

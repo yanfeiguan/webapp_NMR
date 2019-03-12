@@ -25,13 +25,28 @@ SECRET_KEY = 'j%g-*e-113blkv_!w2136(wnzmf6-9ze#!wr%aqwp)9#sr1&&8'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['10.1.62.62']
+# 是否仅仅在测试, 测试和部署的 STATICFILES_DIRS 不同
+DEV = True
+
+# 是否仅仅需要运行http服务, 不用真正计算, 王祥为True, 阿忘为False
+ONLY_SIMPLE_HTTP = True
+
+if DEV:
+    ALLOWED_HOSTS = ["*"]
+else:
+    ALLOWED_HOSTS = ['10.1.62.62']
 
 
 # Application definition
 
-INSTALLED_APPS = [
-    'NMR_Prediction.apps.NmrPredictionConfig',
+if ONLY_SIMPLE_HTTP:
+    INSTALLED_APPS = []
+else:
+    INSTALLED_APPS = [
+        'NMR_Prediction.apps.NmrPredictionConfig',
+    ]
+
+INSTALLED_APPS +=  [
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -124,4 +139,7 @@ STATICFILES_DIRS = (
     os.path.join(BASE_DIR, 'static/'),
 )
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
+if DEV:
+    pass
+else:
+    STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
