@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+{% load static %}
+<html>
+  <head>
+    <title></title>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <script src="{% static 'jquery-3.1.0.js' %}"></script>
+  </head>
+  <body>
+    <h1>正在执行需要很长很长时间的任务...</h1>
+    <h2>任务id: {{taskid}} </h2>
+    <script>
+      intervalid = 0
+      function check_status() {
+        $.ajax({
+          url: "{% url 'djangoexample:check' %}",
+          data: {
+            "taskid": "{{taskid}}",
+          },
+          success: function(res) {
+            if (res["result"]) {
+              alert("得到结果啦" + res["result"])
+              clearInterval(intervalid)
+            } else {
+              console.info("还没有得到结果哦")
+            }
+          }
+        })
+      }
+      intervalid = setInterval(check_status, 200)
+    </script>
+  </body>
+</html>
